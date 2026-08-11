@@ -1,473 +1,264 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import AlertBox from "../assests/components/AlertBox";
+import FruitCard from "../assests/components/FruitCard";
+import StatCard from "../assests/components/StatCard";
+import { fetchFruitData } from "../services/api";
+import { requestFirebaseNotificationPermission, onForegroundMessage } from "../services/firebase";
 
-export default function Dashboard() {
-  const [fruits, setFruits] = useState([
-    {
-      id: 1,
-      name: "Apple",
-      status: "Fresh",
-      spoilage: 18,
-      temp: 27,
-      humidity: 62,
-      gas: 103,
-      image:
-        "https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?q=80&w=600",
-    },
+const fruitImages = {
+  Apple: "https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?q=80&w=600&auto=format&fit=crop",
+  Banana: "https://images.unsplash.com/photo-1603833665858-e61d17a86224?q=80&w=600&auto=format&fit=crop",
+  Orange: "https://images.unsplash.com/photo-1580052614034-c55d20bfee3b?q=80&w=600&auto=format&fit=crop",
+  Mango: "https://images.unsplash.com/photo-1553279768-865429fa0078?q=80&w=600&auto=format&fit=crop",
+};
 
-    {
-      id: 2,
-      name: "Banana",
-      status: "Spoiling",
-      spoilage: 55,
-      temp: 31,
-      humidity: 74,
-      gas: 965,
-      image:
-        "https://images.unsplash.com/photo-1603833665858-e61d17a86224?q=80&w=600",
-    },
+const buildAlerts = (fruitList) => {
+  const alerts = [];
 
-    {
-      id: 3,
-      name: "Orange",
-      status: "Fresh",
-      spoilage: 24,
-      temp: 26,
-      humidity: 60,
-      gas: 210,
-      image:
-        "https://images.unsplash.com/photo-1580052614034-c55d20bfee3b?q=80&w=600",
-    },
+  fruitList.forEach((fruit) => {
+    const name = fruit.fruit_type || fruit.name || fruit.id || "Fruit";
+    const status = fruit.freshness_status || fruit.Freshness_status || fruit.status || "Unknown";
+    const spoilage = Number(fruit.spoilage_level ?? fruit.spoilage ?? 0);
+    const humidity = Number(fruit.sensor_humidity ?? fruit.humidity ?? 0);
+    const gas = Number(fruit.gas_tvoc ?? fruit.gas ?? fruit.gas_tvoc_ppm ?? 0);
 
-    {
-      id: 4,
-      name: "Mango",
-      status: "Spoiled",
-      spoilage: 82,
-      temp: 35,
-      humidity: 78,
-      gas: 1240,
-      image:
-        "https://images.unsplash.com/photo-1553279768-865429fa0078?q=80&w=600",
-    },
-  ]);
+    if (status === "Spoiling") {
+      alerts.push(`⚠ ${name} is spoiling`);
+    }
 
-  const [showModal, setShowModal] = useState(false);
+    if (status === "Spoiled") {
+      alerts.push(`⚠ ${name} is spoiled`);
+    }
 
-  const [newFruit, setNewFruit] = useState({
-    name: "",
-    status: "Fresh",
-    spoilage: "",
-    temp: "",
-    humidity: "",
-    gas: "",
-    image: "",
+    if (spoilage >= 70) {
+      alerts.push(`⚠ ${name} spoilage is ${spoilage}%`);
+    }
+
+    if (humidity > 75) {
+      alerts.push(`⚠ ${name} humidity is high (${humidity}%)`);
+    }
+
+    if (gas > 900) {
+      alerts.push(`⚠ ${name} gas level is high (${gas} ppm)`);
+    }
   });
 
-  const getBorder = (status) => {
-    switch (status) {
-      case "Fresh":
-        return "border-green-500";
+  return [...new Set(alerts)].slice(0, 5);
+};
 
-      case "Spoiling":
-        return "border-yellow-500";
+export default function Dashboard({ user, onLogout }) {
+  const [fruits, setFruits] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [pushStatus, setPushStatus] = useState(
+    typeof Notification !== "undefined"
+      ? Notification.permission === "granted"
+        ? "Push notifications enabled"
+        : Notification.permission === "denied"
+        ? "Push notifications blocked"
+        : "Push notifications not enabled"
+      : "Push notifications not enabled"
+  );
+  const [isEnablingPush, setIsEnablingPush] = useState(false);
 
-      case "Spoiled":
-        return "border-red-500";
+  useEffect(() => {
+    const loadFruits = async () => {
+      try {
+        const data = await fetchFruitData();
 
-      default:
-        return "border-gray-500";
+        if (Array.isArray(data) && data.length > 0) {
+          setFruits(data);
+          setAlerts(buildAlerts(data));
+          setError("");
+        } else {
+          setFruits([]);
+          setAlerts([]);
+          setError("No live data available.");
+        }
+      } catch (err) {
+        setFruits([]);
+        setAlerts([]);
+        setError("Unable to load live data. Please check the backend or Firebase configuration.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFruits();
+  }, []);
+
+  useEffect(() => {
+    if (typeof Notification !== "undefined") {
+      if (Notification.permission === "granted") {
+        setPushStatus("Push notifications enabled");
+      } else if (Notification.permission === "denied") {
+        setPushStatus("Push notifications blocked");
+      }
+    }
+  }, []);
+
+  const handleEnablePushNotifications = async () => {
+    setIsEnablingPush(true);
+    setPushStatus("Enabling push notifications...");
+
+    try {
+      const token = await requestFirebaseNotificationPermission();
+      console.log("FCM token:", token);
+      setPushStatus("Push notifications enabled");
+    } catch (err) {
+      console.warn("FCM setup failed:", err);
+      setPushStatus(err.message || "Notification permission was not granted. Please allow notifications in your browser and try again.");
+    } finally {
+      setIsEnablingPush(false);
     }
   };
 
-  const getBadge = (status) => {
+  useEffect(() => {
+    let unsubscribe;
+
+    try {
+      unsubscribe = onForegroundMessage((payload) => {
+        const title = payload.notification?.title || payload.data?.title || "Notification";
+        const body = payload.notification?.body || payload.data?.body || payload.data?.message || "";
+        setAlerts((currentAlerts) => [`📩 ${title}: ${body}`, ...currentAlerts].slice(0, 5));
+      });
+    } catch (err) {
+      console.warn("FCM foreground listener unavailable:", err);
+    }
+
+    return unsubscribe;
+  }, []);
+
+  const getStatusColor = (status) => {
     switch (status) {
       case "Fresh":
-        return "bg-green-500";
-
+        return "bg-emerald-500";
       case "Spoiling":
-        return "bg-yellow-500";
-
+        return "bg-yellow-400 text-black";
       case "Spoiled":
         return "bg-red-500";
-
       default:
         return "bg-gray-500";
     }
   };
 
-  const addFruit = () => {
-    if (!newFruit.name) return;
-
-    const fruit = {
-      ...newFruit,
-      id: Date.now(),
-    };
-
-    setFruits([...fruits, fruit]);
-
-    setNewFruit({
-      name: "",
-      status: "Fresh",
-      spoilage: "",
-      temp: "",
-      humidity: "",
-      gas: "",
-      image: "",
-    });
-
-    setShowModal(false);
+  const getBorderColor = (status) => {
+    switch (status) {
+      case "Fresh":
+        return "border-emerald-500";
+      case "Spoiling":
+        return "border-yellow-400";
+      case "Spoiled":
+        return "border-red-500";
+      default:
+        return "border-gray-500";
+    }
   };
 
+  const liveStatus = loading
+    ? "Loading live data..."
+    : error
+    ? "No live data"
+    : "Live telemetry connected";
+
   return (
-   <div className="min-h-screen bg-gradient-to-br from-black via-blue-950 to-black text-white p-4 sm:p-6">
-      <div className="max-w-7xl mx-auto">
-
-        {/* HEADER */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-10">
-
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-4 sm:p-6">
+      <div className="max-w-6xl mx-auto">
+        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl sm:text-5xl font-bold">
-              Smart Fruit Spoilage Monitor
-            </h1>
-
-            <p className="text-gray-400 mt-3">
-              Real-time IoT based spoilage detection
-            </p>
+            <h1 className="text-3xl sm:text-5xl font-bold">Smart Fruit Monitor</h1>
+            <p className="text-gray-400 mt-2">Live IoT fruit telemetry from your backend.</p>
           </div>
 
-          <div className="flex gap-4 items-center flex-wrap">
-
-            <div className="bg-green-700 px-4 py-2 rounded-2xl shadow-lg">
-              Live Connected
-            </div>
-
-            <div className="bg-red-600 px-4 py-2 rounded-2xl shadow-lg animate-pulse">
-              🔔 3 Alerts
-            </div>
-
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="text-sm text-gray-300">Logged in as {user.email}</div>
             <button
-              onClick={() => setShowModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-2xl shadow-lg font-semibold transition-all duration-300"
+              onClick={onLogout}
+              className="rounded-2xl bg-gray-800 px-4 py-2 text-sm text-white hover:bg-gray-700 transition"
             >
-              + Add Fruit
+              Logout
             </button>
-
           </div>
+        </header>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+          <StatCard title="Total Fruits" value={fruits.length} color="text-cyan-300" />
+          <StatCard
+            title="Fresh"
+            value={fruits.filter((fruit) => {
+              const status = fruit.freshness_status || fruit.Freshness_status || fruit.status;
+              return status === "Fresh";
+            }).length}
+            color="text-emerald-400"
+          />
+          <StatCard
+            title="Spoiling"
+            value={fruits.filter((fruit) => {
+              const status = fruit.freshness_status || fruit.Freshness_status || fruit.status;
+              return status === "Spoiling";
+            }).length}
+            color="text-yellow-400"
+          />
+          <StatCard
+            title="Spoiled"
+            value={fruits.filter((fruit) => {
+              const status = fruit.freshness_status || fruit.Freshness_status || fruit.status;
+              return status === "Spoiled";
+            }).length}
+            color="text-red-400"
+          />
         </div>
 
-        {/* STATS CARDS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
-
-          <div className="bg-gray-900 rounded-3xl p-6 border border-gray-700">
-            <h2 className="text-gray-400 text-sm">Total Fruits</h2>
-
-            <p className="text-5xl font-bold mt-3">
-              {fruits.length}
-            </p>
+        <div className="mb-8 grid gap-4 sm:grid-cols-2">
+          <div className="bg-gray-900 border border-gray-800 rounded-3xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Alerts</h2>
+            </div>
+            <div className="space-y-3">
+              {loading ? (
+                <div className="text-gray-400">Loading alerts...</div>
+              ) : alerts.length > 0 ? (
+                alerts.map((alert, index) => <AlertBox key={index} alert={alert} />)
+              ) : (
+                <div className="text-gray-400">No live alerts found.</div>
+              )}
+            </div>
           </div>
 
-          <div className="bg-gray-900 rounded-3xl p-6 border border-green-500">
-            <h2 className="text-gray-400 text-sm">Fresh</h2>
-
-            <p className="text-5xl font-bold text-green-400 mt-3">
-              {
-                fruits.filter(
-                  (fruit) => fruit.status === "Fresh"
-                ).length
-              }
-            </p>
-          </div>
-
-          <div className="bg-gray-900 rounded-3xl p-6 border border-yellow-500">
-            <h2 className="text-gray-400 text-sm">Spoiling</h2>
-
-            <p className="text-5xl font-bold text-yellow-400 mt-3">
-              {
-                fruits.filter(
-                  (fruit) => fruit.status === "Spoiling"
-                ).length
-              }
-            </p>
-          </div>
-
-          <div className="bg-gray-900 rounded-3xl p-6 border border-red-500">
-            <h2 className="text-gray-400 text-sm">Spoiled</h2>
-
-            <p className="text-5xl font-bold text-red-400 mt-3">
-              {
-                fruits.filter(
-                  (fruit) => fruit.status === "Spoiled"
-                ).length
-              }
-            </p>
-          </div>
-
-        </div>
-
-        {/* FRUIT GRID */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-
-          {fruits.map((fruit) => (
-
-            <div
-              key={fruit.id}
-             className={`bg-gray-900 rounded-3xl p-5 border-2 ${getBorder(
-  fruit.status
-)} shadow-2xl hover:scale-105 transition-all duration-300`}
+          <div className="bg-gray-900 border border-gray-800 rounded-3xl p-5">
+            <h2 className="text-lg font-semibold mb-4">Data Status</h2>
+            <p className="text-gray-300 mb-2">{liveStatus}</p>
+            <p className="text-gray-300 mb-2">{pushStatus}</p>
+            <button
+              onClick={handleEnablePushNotifications}
+              disabled={isEnablingPush}
+              className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-70"
             >
+              {isEnablingPush ? "Enabling..." : "Enable push"}
+            </button>
+            {error && <p className="text-sm text-amber-300 mt-3">{error}</p>}
+          </div>
+        </div>
 
-            <div className="flex justify-between items-start mb-5">
+        {error && !loading ? (
+          <div className="mb-8 rounded-3xl border border-red-700 bg-red-950 p-6 text-red-200">
+            <p className="font-semibold">No live data is available.</p>
+            <p className="text-gray-400 mt-2">Please confirm your backend and Firebase setup, or check your IoT data source.</p>
+          </div>
+        ) : null}
 
-  <div>
-    <h2 className="text-2xl font-bold">
-      {fruit.name}
-    </h2>
-  </div>
-
-  <div className="flex items-center gap-2">
-
-    <div
-      className={`px-3 py-1 rounded-full text-sm font-semibold ${getBadge(
-        fruit.status
-      )}`}
-    >
-      {fruit.status}
-    </div>
-
-    {/* DELETE BUTTON WITH CONFIRMATION */}
-<button
-  onClick={() => {
-    const confirmDelete = window.confirm(
-      `Are you sure you want to delete ${fruit.name}?`
-    );
-
-    if (confirmDelete) {
-      setFruits(
-        fruits.filter((item) => item.id !== fruit.id)
-      );
-    }
-  }}
-  className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-full text-sm font-bold"
->
-  ✕
-</button>
-  </div>
-
-</div>
-
-              {/* SPOILAGE */}
-              <div className="mb-5">
-
-                <div className="flex justify-between mb-2 text-sm">
-                  <span>Spoilage</span>
-                  <span>{fruit.spoilage}%</span>
-                </div>
-
-                <div className="bg-gray-700 h-4 rounded-full overflow-hidden">
-
-                  <div
-                    className={`${getBadge(
-                      fruit.status
-                    )} h-4 rounded-full`}
-                    style={{
-                      width: `${fruit.spoilage}%`,
-                    }}
-                  />
-
-                </div>
-
-              </div>
-
-              {/* SENSOR DETAILS */}
-              <div className="space-y-3 text-gray-300">
-
-                <div className="flex justify-between">
-                  <span>🌡 Temperature</span>
-                  <span>{fruit.temp}°C</span>
-                </div>
-
-                <div className="flex justify-between">
-                  <span>💧 Humidity</span>
-                  <span>{fruit.humidity}%</span>
-                </div>
-
-                <div className="flex justify-between">
-                  <span>🧪 TVOC Gas</span>
-                  <span>{fruit.gas} ppm</span>
-                </div>
-
-              </div>
-
-            </div>
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+          {fruits.map((fruit) => (
+            <FruitCard
+              key={fruit.id}
+              fruit={fruit}
+              fruitImages={fruitImages}
+              getStatusColor={getStatusColor}
+              getBorderColor={getBorderColor}
+            />
           ))}
-
         </div>
-
-        {/* ALERT SECTION */}
-        <div className="mt-14">
-
-          <h2 className="text-4xl font-bold text-red-400 mb-8">
-            Real-Time Alerts
-          </h2>
-
-          <div className="space-y-5">
-
-            <div className="bg-red-950 border border-red-600 rounded-3xl p-6 text-xl">
-              ⚠ Banana humidity increasing
-            </div>
-
-            <div className="bg-red-950 border border-red-600 rounded-3xl p-6 text-xl">
-              ⚠ Mango already spoiled
-            </div>
-
-            <div className="bg-red-950 border border-red-600 rounded-3xl p-6 text-xl">
-              ⚠ Apple may spoil in 12 hours
-            </div>
-
-          </div>
-
-        </div>
-
-        {/* MODAL */}
-        {showModal && (
-
-          <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50 p-4">
-
-            <div className="bg-gray-900 rounded-3xl p-6 w-full max-w-md border border-cyan-500">
-
-              <h2 className="text-3xl font-bold mb-6">
-                Add New Fruit
-              </h2>
-
-              <div className="space-y-4">
-
-                <input
-                  type="text"
-                  placeholder="Fruit Name"
-                  value={newFruit.name}
-                  onChange={(e) =>
-                    setNewFruit({
-                      ...newFruit,
-                      name: e.target.value,
-                    })
-                  }
-                  className="w-full p-3 rounded-xl bg-gray-800 border border-gray-700"
-                />
-
-                <select
-                  value={newFruit.status}
-                  onChange={(e) =>
-                    setNewFruit({
-                      ...newFruit,
-                      status: e.target.value,
-                    })
-                  }
-                  className="w-full p-3 rounded-xl bg-gray-800 border border-gray-700"
-                >
-                  <option>Fresh</option>
-                  <option>Spoiling</option>
-                  <option>Spoiled</option>
-                </select>
-
-                <input
-                  type="number"
-                  placeholder="Spoilage %"
-                  value={newFruit.spoilage}
-                  onChange={(e) =>
-                    setNewFruit({
-                      ...newFruit,
-                      spoilage: e.target.value,
-                    })
-                  }
-                  className="w-full p-3 rounded-xl bg-gray-800 border border-gray-700"
-                />
-
-                <input
-                  type="number"
-                  placeholder="Temperature"
-                  value={newFruit.temp}
-                  onChange={(e) =>
-                    setNewFruit({
-                      ...newFruit,
-                      temp: e.target.value,
-                    })
-                  }
-                  className="w-full p-3 rounded-xl bg-gray-800 border border-gray-700"
-                />
-
-                <input
-                  type="number"
-                  placeholder="Humidity"
-                  value={newFruit.humidity}
-                  onChange={(e) =>
-                    setNewFruit({
-                      ...newFruit,
-                      humidity: e.target.value,
-                    })
-                  }
-                  className="w-full p-3 rounded-xl bg-gray-800 border border-gray-700"
-                />
-
-                <input
-                  type="number"
-                  placeholder="TVOC Gas"
-                  value={newFruit.gas}
-                  onChange={(e) =>
-                    setNewFruit({
-                      ...newFruit,
-                      gas: e.target.value,
-                    })
-                  }
-                  className="w-full p-3 rounded-xl bg-gray-800 border border-gray-700"
-                />
-
-                <input
-                  type="text"
-                  placeholder="Image URL"
-                  value={newFruit.image}
-                  onChange={(e) =>
-                    setNewFruit({
-                      ...newFruit,
-                      image: e.target.value,
-                    })
-                  }
-                  className="w-full p-3 rounded-xl bg-gray-800 border border-gray-700"
-                />
-
-              </div>
-
-              {/* BUTTONS */}
-              <div className="flex gap-4 mt-6">
-
-                <button
-                  onClick={addFruit}
-                  className="flex-1 bg-cyan-500 hover:bg-cyan-600 py-3 rounded-2xl font-semibold"
-                >
-                  Add Fruit
-                </button>
-
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 bg-red-500 hover:bg-red-600 py-3 rounded-2xl font-semibold"
-                >
-                  Cancel
-                </button>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        )}
-
-        {/* FOOTER */}
-        <div className="mt-16 text-center text-gray-500 text-lg">
-          Smart IoT Fruit Monitoring System
-        </div>
-
       </div>
     </div>
   );
