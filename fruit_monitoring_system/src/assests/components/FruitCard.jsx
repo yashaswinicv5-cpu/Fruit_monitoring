@@ -1,17 +1,22 @@
+import { getFruitStatus } from "../../utils/status";
 import SensorRow from "./SensorRow";
 
-export default function FruitCard({ fruit, fruitImages, getStatusColor, getBorderColor }) {
+export default function FruitCard({ fruit, fruitImages, getStatusColor, getBorderColor, theme = "dark" }) {
   const imageSrc =
     fruit.image || fruitImages?.[fruit.fruit_type] ||
     "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=600&auto=format&fit=crop";
 
-  const status = fruit.freshness_status || fruit.Freshness_status || fruit.status || "Unknown";
+  const status = getFruitStatus(fruit);
   const displayName = fruit.fruit_type || fruit.name || fruit.id || "Fruit";
 
+  const containerClass = theme === "light"
+    ? `bg-white border ${getBorderColor(status)} rounded-3xl p-5 shadow-xl`
+    : `bg-gray-900 border ${getBorderColor(status)} rounded-3xl p-5 shadow-xl`;
+
+  const progressBg = theme === "light" ? "bg-slate-200" : "bg-gray-700";
+
   return (
-    <div
-      className={`bg-gray-900 border ${getBorderColor(status)} rounded-3xl p-5 shadow-xl`}
-    >
+    <div className={containerClass}>
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-xl font-bold">{displayName}</h3>
 
@@ -36,11 +41,9 @@ export default function FruitCard({ fruit, fruitImages, getStatusColor, getBorde
           <span>{fruit.spoilage_level ?? fruit.spoilage ?? 0}%</span>
         </div>
 
-        <div className="w-full bg-gray-700 h-3 rounded-full overflow-hidden">
+        <div className={`${progressBg} h-3 rounded-full overflow-hidden`}>
           <div
-            className={`${getStatusColor(
-              fruit.freshness_status || fruit.status
-            )} h-3 rounded-full`}
+            className={`${getStatusColor(status)} h-3 rounded-full`}
             style={{
               width: `${fruit.spoilage_level ?? fruit.spoilage ?? 0}%`,
             }}
