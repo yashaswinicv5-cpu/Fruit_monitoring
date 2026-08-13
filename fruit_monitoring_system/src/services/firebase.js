@@ -152,7 +152,7 @@ export const fetchFruitData = async () => {
     throw new Error("Firebase is not configured. Set VITE_FIREBASE_* environment variables.");
   }
 
-  const fruitsCollection = collection(db, "fruit monitoring");
+  const fruitsCollection = collection(db, "sensorData");
   const snapshot = await getDocs(fruitsCollection);
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 };

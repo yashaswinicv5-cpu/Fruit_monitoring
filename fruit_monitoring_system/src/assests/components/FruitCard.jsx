@@ -54,7 +54,7 @@ export default function FruitCard({ fruit, fruitImages, getStatusColor, getBorde
       <div className="space-y-2">
         <SensorRow
           label="🌡 Temp"
-          value={`${fruit.sensor_temperature ?? fruit.temp ?? "--"}°C`}
+          value={`${fruit.sensor_temperature ?? fruit.temp ?? fruit.temperature ?? "--"}°C`}
         />
 
         <SensorRow
@@ -64,12 +64,12 @@ export default function FruitCard({ fruit, fruitImages, getStatusColor, getBorde
 
         <SensorRow
           label="🧪 TVOC"
-          value={`${fruit.gas_tvoc ?? fruit.gas ?? fruit.gas_tvoc_ppm ?? "--"} ppm`}
+          value={`${fruit.gas_tvoc ?? fruit.gas ?? fruit.tvoc ?? fruit.tvoc_ppm ?? fruit.gas_tvoc_ppm ?? "--"} ppm`}
         />
 
         <SensorRow
           label="🫧 eCO2"
-          value={`${fruit.eco2_level ?? fruit.eco2_level_ppm ?? "--"} ppm`}
+          value={`${fruit.eco2_level ?? fruit.eco2_level_ppm ?? fruit.eco2 ?? fruit.eCO2 ?? fruit.co2 ?? "--"} ppm`}
         />
       </div>
     </div>

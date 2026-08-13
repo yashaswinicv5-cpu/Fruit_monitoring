@@ -212,8 +212,8 @@ export default function Dashboard({ user, onLogout }) {
       spoiling,
       spoiled,
       avgHumidity: average("sensor_humidity") || average("humidity"),
-      avgTemperature: average("sensor_temperature") || average("temp"),
-      avgGas: average("gas_tvoc") || average("gas"),
+      avgTemperature: average("sensor_temperature") || average("temp") || average("temperature"),
+      avgGas: average("gas_tvoc") || average("gas") || average("tvoc") || average("tvoc_ppm"),
       selectedFruit: fruits.find((fruit) => fruit.id === selectedFruitId) || fruits[0] || null,
     };
   }, [fruits, selectedFruitId]);
@@ -440,10 +440,10 @@ export default function Dashboard({ user, onLogout }) {
                 <div className={`rounded-3xl border p-6 ${styles.card}`}>
                   <h3 className="text-xl font-semibold">Details for {stats.selectedFruit?.fruit_type || stats.selectedFruit?.name || "Selected fruit"}</h3>
                   <div className={`mt-5 space-y-4 text-sm ${theme === "light" ? "text-slate-700" : "text-slate-300"}`}>
-                    <p><span className={theme === "light" ? "text-slate-500" : "text-slate-400"}>Temperature:</span> {stats.selectedFruit?.sensor_temperature ?? stats.selectedFruit?.temp ?? "--"}°C</p>
                     <p><span className={theme === "light" ? "text-slate-500" : "text-slate-400"}>Humidity:</span> {stats.selectedFruit?.sensor_humidity ?? stats.selectedFruit?.humidity ?? "--"}%</p>
-                    <p><span className={theme === "light" ? "text-slate-500" : "text-slate-400"}>TVOC:</span> {stats.selectedFruit?.gas_tvoc ?? stats.selectedFruit?.gas ?? stats.selectedFruit?.gas_tvoc_ppm ?? "--"} ppm</p>
-                    <p><span className={theme === "light" ? "text-slate-500" : "text-slate-400"}>eCO2:</span> {stats.selectedFruit?.eco2_level ?? stats.selectedFruit?.eco2_level_ppm ?? "--"} ppm</p>
+                    <p><span className={theme === "light" ? "text-slate-500" : "text-slate-400"}>Temperature:</span> {stats.selectedFruit?.sensor_temperature ?? stats.selectedFruit?.temp ?? stats.selectedFruit?.temperature ?? "--"}°C</p>
+                    <p><span className={theme === "light" ? "text-slate-500" : "text-slate-400"}>TVOC:</span> {stats.selectedFruit?.gas_tvoc ?? stats.selectedFruit?.gas ?? stats.selectedFruit?.tvoc ?? stats.selectedFruit?.tvoc_ppm ?? stats.selectedFruit?.gas_tvoc_ppm ?? "--"} ppm</p>
+                    <p><span className={theme === "light" ? "text-slate-500" : "text-slate-400"}>eCO2:</span> {stats.selectedFruit?.eco2_level ?? stats.selectedFruit?.eco2_level_ppm ?? stats.selectedFruit?.eco2 ?? stats.selectedFruit?.eCO2 ?? stats.selectedFruit?.co2 ?? "--"} ppm</p>
                     <p><span className={theme === "light" ? "text-slate-500" : "text-slate-400"}>Spoilage Rating:</span> {stats.selectedFruit?.spoilage_level ?? stats.selectedFruit?.spoilage ?? 0}%</p>
                     <div className={`rounded-3xl p-4 text-sm ${theme === "light" ? "bg-slate-100 text-slate-900" : "bg-slate-950 text-slate-400"}`}>
                       <p className={`font-semibold ${theme === "light" ? "text-slate-900" : "text-slate-100"}`}>Action</p>
